@@ -1,0 +1,6 @@
+Perceptron1_Network
+nb_Layers= 2
+perceptron
+weights= [2][1][2] { 1.075399671299317,1.043054231039913}
+biais= [1] { -11.17766805247981}
+activation
