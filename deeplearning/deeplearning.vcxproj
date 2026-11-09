@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BMPfile.h" />
     <ClInclude Include="CMNISTReader.h" />
     <ClInclude Include="CRandom.h" />
     <ClInclude Include="dataExporter.h" />
@@ -143,6 +144,7 @@
     <ClInclude Include="tools.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BMPfile.cpp" />
     <ClCompile Include="CMNISTReader.cpp" />
     <ClCompile Include="CRandom.cpp" />
     <ClCompile Include="dataExporter.cpp" />

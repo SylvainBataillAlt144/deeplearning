@@ -165,8 +165,8 @@ public:
 	}
 	inline Matrix<T> operator-(const T& s) const {
 		Matrix<T> output(m_cols, m_rows);
-		T vs[4] = { s, s, s, s };
-		__m256d vs = _mm256_loadu_pu(vs);
+		T vecs[4] = { s, s, s, s };
+		__m256d vs = _mm256_load_pd(&vecs[0]);
 		for (size_t i = 0; i + 3 < m_data.size(); i += 4) {
 			__m256d va = _mm256_loadu_pd(&m_data[i]);
 			__m256d vsub = _mm256_sub_pd(va, vs);
@@ -512,6 +512,18 @@ public:
 			if (m_data[i] > dMax) {
 				max = i;
 				dMax = m_data[i];
+			}
+		}
+		return max;
+	}
+
+	std::size_t MaxIndexCol(size_t c) {
+		std::size_t max = 0;
+		T dMax = T(0);
+		for (std::size_t i = 0; i < m_rows; i++) {
+			if (m_data[i * m_cols + c] > dMax) {
+				max = i;
+				dMax = m_data[i * m_cols + c];
 			}
 		}
 		return max;

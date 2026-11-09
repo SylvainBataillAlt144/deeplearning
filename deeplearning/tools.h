@@ -22,6 +22,11 @@ U normalize(T value, T min, T max) {
 	return U(U(value - min) / U(max - min));
 }
 
+template <class T, class U>
+U denormalize(T value, T min,T max) {
+	return U((value + min) * (max - min));
+}
+
 std::int64_t GetFileSize(std::ifstream & Fichier);
 
 
@@ -85,3 +90,5 @@ void ThreadingTemplate(const uint32_t size, Fn&& function, Args&&... args) {
 		function(0, size, std::forward<Args>(args)...);
 	}
 }
+
+std::string intToStringWithZeros(int number, uint8_t width);

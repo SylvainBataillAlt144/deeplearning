@@ -10,31 +10,38 @@
 #include "CMNISTReader.h"
 #include "tools.h"
 #include "dataExporter.h"
+#include "BMPfile.h"
+
 
 const std::string dataPath = "C:\\Users\\SylvainBATAILLÉ\\Downloads\\idx_dataset\\";
 
-//void CNN(bool m_training = false, bool m_testing = true, bool m_load = true, std::string m_file = ".\\CNN_bis.txt", bool m_save = false) {
-void CNN(bool m_training = true, bool m_testing = true, bool m_load = false, std::string m_file = ".\\CNN.txt", bool m_save = true) {
-	uint8_t nbConv = 4;
+const std::string dataPathAN = "C:\\Users\\SylvainBATAILLÉ\\Downloads\\gzip\\gzip\\";
+
+void CNN_AlphaNum(bool m_training = false, bool m_testing = true, bool m_load = true, std::string m_file = ".\\CNN_AlphaNum_16_63.txt", bool m_save = false);
+//void CNN_AlphaNum(bool m_training = true, bool m_testing = true, bool m_load = true/*false*/, std::string m_file = ".\\CNN_AlphaNum.txt", bool m_save = true);
+
+void CNN_AlphaNum(bool m_training, bool m_testing, bool m_load, std::string m_file, bool m_save) {
+	uint8_t nbConv = 8;
 	uint32_t imgC = 28, imgR = 28;
-	uint32_t nbNi1 = 120, nbNi2 = 84, nbNO = 10;
+	uint32_t nbNi1 = 480, nbNi2 = 168, nbNO = 10 + 26 + 26;
 	uint16_t batchSize = 1000;
 
-	NNetwork m_nNetwork("CNN_Network", DCrossEntropyLoss_Matrix<double>);
 
-	uint32_t nbImputPerceptron1 = ((imgC * imgR) * nbConv / 4)*nbConv / 4;
+	uint32_t nbImputPerceptron1 = ((imgC * imgR) * nbConv / 4) * nbConv / 4;
 	std::shared_ptr<OperatorConvolution<double, ConvKerSize::K5X5>> opeConv = std::make_shared<OperatorConvolution<double, ConvKerSize::K5X5>>(nbConv, true);
 	std::shared_ptr<OperatorConvolution<double, ConvKerSize::K3X3>> opeConv2 = std::make_shared<OperatorConvolution<double, ConvKerSize::K3X3>>(nbConv, true);
 	std::shared_ptr<OperatorPooling<double, PollingSize::P2>> opePooling = std::make_shared<OperatorPooling<double, PollingSize::P2>>();
-	std::shared_ptr<OperatorFlatten<double, FlattenFormat::COL>> opeFlatten = std::make_shared <OperatorFlatten<double, FlattenFormat::COL>>(nbConv*nbConv );
+	std::shared_ptr<OperatorFlatten<double, FlattenFormat::COL>> opeFlatten = std::make_shared <OperatorFlatten<double, FlattenFormat::COL>>(nbConv * nbConv);
 	std::shared_ptr<OperatorConcat<double, FlattenFormat::COL>> opeConcat = std::make_shared <OperatorConcat<double, FlattenFormat::COL>>();
 	std::shared_ptr<OperatorFunction<double>> opeSigmoid = std::make_shared<OperatorFunction<double>>(sigmoidStable<double>, DSigmoid<double>);
 	std::shared_ptr<OperatorFunction<double>> opeReLU = std::make_shared<OperatorFunction<double>>(Relu<double>, DRelu<double>);
 	std::shared_ptr<OperatorPerceptron<double>> opePerceptron1 = std::make_shared<OperatorPerceptron<double>>(nbImputPerceptron1, nbNi1);
 	std::shared_ptr<OperatorDropout<double>> opeDropout = std::make_shared<OperatorDropout<double>>(20);
 	std::shared_ptr<OperatorPerceptron<double>> opePerceptron2 = std::make_shared<OperatorPerceptron<double>>(nbNi1, nbNi2);
+	std::shared_ptr<OperatorPerceptron<double>> opePerceptron3 = std::make_shared<OperatorPerceptron<double>>(nbNi2, nbNi2);
 	std::shared_ptr<OperatorPerceptron<double>> opeOutput = std::make_shared<OperatorPerceptron<double>>(nbNi2, nbNO);
 
+	NNetwork m_nNetwork("CNN_AlphaNum", DCrossEntropyLoss_Matrix<double>);
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeConv, "3conv5x5")));
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePooling, "pooling2x2")));
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeReLU, "activationReLUConv1")));
@@ -49,6 +56,264 @@ void CNN(bool m_training = true, bool m_testing = true, bool m_load = false, std
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation1")));
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeDropout, "dropout_perceptron1")));
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePerceptron2, "perceptrion2")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation1")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePerceptron3, "perceptrion3")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation1")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeOutput, "output10")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation10")));
+
+	Serialize serialiser;
+	if (m_load) {
+		bool res = serialiser.Load(m_file, m_nNetwork);
+		if (!res) {
+			m_training = false;
+		}
+
+	}
+
+	if (m_training) {
+		std::string labelsFile = "emnist-byclass-train-labels-idx1-ubyte\\emnist-byclass-train-labels-idx1-ubyte";
+		std::string imagesFile = "emnist-byclass-train-images-idx3-ubyte\\emnist-byclass-train-images-idx3-ubyte";
+
+		std::vector<Matrix<double>> expectedY;
+		std::vector<Matrix<double>> dataImg;
+		std::cout << "training:" << std::endl;
+		std::cout << "	read data training:" << std::endl;
+		BuildData(labelsFile, imagesFile, dataPathAN, expectedY, dataImg, nbNO, false, 200000, 400000);
+
+		bool learningIsFinish = false;
+		std::cout << "	training with " << expectedY.size() << " data:" << std::endl;
+		std::size_t nbIter = 100;//350
+		uint64_t ttotal = 0;
+		uint64_t p = 0;
+		double Emin = 1.0;
+		size_t last = 0;
+		double learningRate = 10.0;//40.0;// 25.0;//10.0;//5.0; //2.5;
+		double var = learningRate / 2.0;
+		std::size_t nbBatch = dataImg.size() / batchSize;
+		for (std::size_t iter = 0; iter < nbIter && !learningIsFinish; iter++) {
+			for (std::size_t b = 0; b < nbBatch && !learningIsFinish; b++) {
+
+				auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+				std::cout << "\r";
+				std::cout << std::to_string(double(p) / double(nbBatch * nbIter) * 100.0) << "%";
+				std::vector<Matrix<double>> input;
+				std::vector<Matrix<double>> eY;
+				std::vector<Matrix<double>> expY(1);
+				std::vector<Matrix<double>> outputA;
+				input.insert(input.end(), dataImg.begin() + b * batchSize, dataImg.begin() + b * batchSize + batchSize);
+				eY.insert(eY.end(), expectedY.begin() + b * batchSize, expectedY.begin() + b * batchSize + batchSize);
+				expY[0].Concat(eY, AxisFormat::COL);
+
+				m_nNetwork.Forward(input, outputA, true);
+
+				//cost function 
+				double E = MSE(expY[0], outputA[0]);
+				if (E < Emin) {
+					Emin = E;
+					last = p;
+					if (m_save) {
+						serialiser.Save(".\\CNN_AlphaNum_bis.txt", m_nNetwork);
+					}
+				}
+				if (std::abs(E) < 0.0001) {
+					learningIsFinish = true;
+				}
+				else {
+					m_nNetwork.Backward(expY, outputA, learningRate);
+					p++;
+				}
+				auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+				auto tempo = t2.count() - t1.count();
+				ttotal += tempo;
+				std::cout << " E= " << std::to_string(E) << " Emin= " << std::to_string(Emin) << " lEmin= " << std::to_string(last)
+					<< " lr=" << std::to_string(learningRate) << " time= " << std::to_string(tempo)
+					<< " ms step " << std::to_string(p) << "/" << std::to_string(nbBatch * nbIter) << " total= " << std::to_string(ttotal / 1000) << "s        ";
+			}
+		}
+		std::cout << std::endl << "100%" << std::endl;
+		if (m_save) {
+			serialiser.Save(".\\CNN_AlphaNum.txt", m_nNetwork);
+		}
+	}
+	if (m_testing) {
+		//test
+		std::string labelsFile = "emnist-byclass-test-labels-idx1-ubyte\\emnist-byclass-test-labels-idx1-ubyte";
+		std::string imagesFile = "emnist-byclass-test-images-idx3-ubyte\\emnist-byclass-test-images-idx3-ubyte";
+		std::string labelsFileN = "t10k-labels.idx1-ubyte";
+		std::string imagesFileN = "t10k-images.idx3-ubyte";
+		std::vector<Matrix<double>> expectedY;
+		std::vector<Matrix<double>> dataImg;
+		std::cout << "testing:" << std::endl;
+		std::cout << "	read data testing:" << std::endl;
+		//BuildData(labelsFileN, imagesFileN, dataPath, expectedY, dataImg, nbNO, true);
+		BuildData(labelsFile, imagesFile, dataPathAN, expectedY, dataImg, nbNO, false, 0, 10000);
+		std::cout << "	testing with " << expectedY.size() << " data:" << std::endl;
+
+		std::vector<Matrix<double>> input = dataImg;
+		std::vector<Matrix<double>> expY(1);
+		std::vector<Matrix<double>> outputA;
+		expY[0].Concat(expectedY, AxisFormat::COL);
+
+		m_nNetwork.Forward(input, outputA);
+
+
+		Matrix<double> result(outputA[0].getCols(), outputA[0].getRows(), 0);
+		for (std::size_t c = 0; c < result.getCols(); c++) {
+			result.at(c, outputA[0].MaxIndexCol(c)) = 1.0;
+		}
+
+		for (std::size_t i = 0; i < opeConv->NbKernel(); i++) {
+			std::cout << "kernel" << std::to_string(i) << "=" << std::endl;
+			opeConv->GetKernel(i).printMatrix();
+			std::cout << "biais= " << std::to_string(opeConv->GetBiais(i)) << std::endl;
+		}
+		for (std::size_t i = 0; i < opeConv2->NbKernel(); i++) {
+			std::cout << "kernel" << std::to_string(i) << "=" << std::endl;
+			opeConv2->GetKernel(i).printMatrix();
+			std::cout << "biais= " << std::to_string(opeConv2->GetBiais(i)) << std::endl;
+		}
+
+		std::vector<char> cR(result.getCols(), 0xFF);
+		std::vector<char> cY(result.getCols());
+		uint32_t error = 0;
+
+		std::vector<char> tableClass(nbNO);
+		for (std::size_t i = 0; i < 10; i++) {
+			tableClass[i] = '0' + char(i);
+		}
+		for (std::size_t i = 0; i < 26; i++) {
+			tableClass[i+10] = 'A' + char(i);
+		}
+		for (std::size_t i = 0; i < 26; i++) {
+			tableClass[i+10+26] = 'a' + char(i);
+		}
+
+		double rp = 0.0;
+		for (uint32_t r = 0; r < result.getRows(); r++) {
+			for (uint32_t c = 0; c < result.getCols(); c++) {
+				if (result.val(c, r) > 0) {
+					cR[c] = tableClass[r];
+				}
+				if (expY[0].val(c, r) > 0) {
+					cY[c] = tableClass[r];
+				}
+			}
+		}
+		std::cout << "compare = ";
+		for (std::size_t i = 0; i < cR.size(); i++) {
+			std::cout << cR[i];
+			if (cR[i] == cY[i])
+				std::cout << "=";
+			else {
+				std::cout << "!=";
+				error++;
+
+				//std::vector<uint8_t> data_bmp;
+				//for (uint32_t c = 0; c < input[i].getCols(); c++) {
+				//	for (uint32_t r = 0; r < input[i].getRows(); r++) {
+				//		data_bmp.push_back(denormalize<double, uint8_t>(input[i].at(c, r), 0.0, 255.0));
+				//	}
+				//}
+				//BMPfile bmp;
+				//std::string R(1, cR[i]);
+				//std::string EY(1, cY[i]);
+				//std::string index = intToStringWithZeros(i, 5);
+				//
+				//
+				//Matrix<uint8_t> img(input[i].getCols(), input[i].getRows(), data_bmp);
+				//img = img.transpose();
+				//
+				//	bmp.writeBMP8bit(".\\img_err\\Res_" + index + "_" + R + "_diff_exp_" + EY + ".bmp",
+				//	input[i].getCols(), input[i].getRows(), img.getData());
+			}
+			std::cout << cY[i] << " ";
+		}
+		std::cout << std::endl;
+
+		std::cout << "errors = " << std::to_string(error) << "/" << std::to_string(result.getCols()) << std::endl;
+		std::cout << "errors% = " << std::to_string(double(error) / (double)result.getCols() * 100) << std::setprecision(1) << " %" << std::endl;
+	}
+}
+
+
+void CNN(bool m_training = false, bool m_testing = true, bool m_load = true, std::string m_file = ".\\CNN_1_40.txt", bool m_save = false) {
+//void CNN(bool m_training = true, bool m_testing = true, bool m_load = true, std::string m_file = ".\\CNN.txt", bool m_save = true) {
+	//uint8_t nbConv = 4;
+	//uint32_t imgC = 28, imgR = 28;
+	//uint32_t nbNi1 = 120, nbNi2 = 84, nbNO = 10;
+	//uint16_t batchSize = 1000;
+
+	//NNetwork m_nNetwork("CNN_Network", DCrossEntropyLoss_Matrix<double>);
+
+	//uint32_t nbImputPerceptron1 = ((imgC * imgR) * nbConv / 4)*nbConv / 4;
+	//std::shared_ptr<OperatorConvolution<double, ConvKerSize::K5X5>> opeConv = std::make_shared<OperatorConvolution<double, ConvKerSize::K5X5>>(nbConv, true);
+	//std::shared_ptr<OperatorConvolution<double, ConvKerSize::K3X3>> opeConv2 = std::make_shared<OperatorConvolution<double, ConvKerSize::K3X3>>(nbConv, true);
+	//std::shared_ptr<OperatorPooling<double, PollingSize::P2>> opePooling = std::make_shared<OperatorPooling<double, PollingSize::P2>>();
+	//std::shared_ptr<OperatorFlatten<double, FlattenFormat::COL>> opeFlatten = std::make_shared <OperatorFlatten<double, FlattenFormat::COL>>(nbConv*nbConv );
+	//std::shared_ptr<OperatorConcat<double, FlattenFormat::COL>> opeConcat = std::make_shared <OperatorConcat<double, FlattenFormat::COL>>();
+	//std::shared_ptr<OperatorFunction<double>> opeSigmoid = std::make_shared<OperatorFunction<double>>(sigmoidStable<double>, DSigmoid<double>);
+	//std::shared_ptr<OperatorFunction<double>> opeReLU = std::make_shared<OperatorFunction<double>>(Relu<double>, DRelu<double>);
+	//std::shared_ptr<OperatorPerceptron<double>> opePerceptron1 = std::make_shared<OperatorPerceptron<double>>(nbImputPerceptron1, nbNi1);
+	//std::shared_ptr<OperatorDropout<double>> opeDropout = std::make_shared<OperatorDropout<double>>(20);
+	//std::shared_ptr<OperatorPerceptron<double>> opePerceptron2 = std::make_shared<OperatorPerceptron<double>>(nbNi1, nbNi2);
+	//std::shared_ptr<OperatorPerceptron<double>> opeOutput = std::make_shared<OperatorPerceptron<double>>(nbNi2, nbNO);
+
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeConv, "3conv5x5")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePooling, "pooling2x2")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeReLU, "activationReLUConv1")));
+
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeConv2, "3conv3x3")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePooling, "pooling2x2")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeReLU, "activationReLUConv2")));
+
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeFlatten, "flattenCol")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeConcat, "concatCol")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePerceptron1, "perceptrion1")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation1")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeDropout, "dropout_perceptron1")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePerceptron2, "perceptrion2")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation1")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeOutput, "output10")));
+	//m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation10")));
+
+	uint8_t nbConv = 8;
+	uint32_t imgC = 28, imgR = 28;
+	uint32_t nbNi1 = 480, nbNi2 = 168, nbNO = 10 + 26 + 26;
+	uint16_t batchSize = 1000;
+
+
+	uint32_t nbImputPerceptron1 = ((imgC * imgR) * nbConv / 4) * nbConv / 4;
+	std::shared_ptr<OperatorConvolution<double, ConvKerSize::K5X5>> opeConv = std::make_shared<OperatorConvolution<double, ConvKerSize::K5X5>>(nbConv, true);
+	std::shared_ptr<OperatorConvolution<double, ConvKerSize::K3X3>> opeConv2 = std::make_shared<OperatorConvolution<double, ConvKerSize::K3X3>>(nbConv, true);
+	std::shared_ptr<OperatorPooling<double, PollingSize::P2>> opePooling = std::make_shared<OperatorPooling<double, PollingSize::P2>>();
+	std::shared_ptr<OperatorFlatten<double, FlattenFormat::COL>> opeFlatten = std::make_shared <OperatorFlatten<double, FlattenFormat::COL>>(nbConv * nbConv);
+	std::shared_ptr<OperatorConcat<double, FlattenFormat::COL>> opeConcat = std::make_shared <OperatorConcat<double, FlattenFormat::COL>>();
+	std::shared_ptr<OperatorFunction<double>> opeSigmoid = std::make_shared<OperatorFunction<double>>(sigmoidStable<double>, DSigmoid<double>);
+	std::shared_ptr<OperatorFunction<double>> opeReLU = std::make_shared<OperatorFunction<double>>(Relu<double>, DRelu<double>);
+	std::shared_ptr<OperatorPerceptron<double>> opePerceptron1 = std::make_shared<OperatorPerceptron<double>>(nbImputPerceptron1, nbNi1);
+	std::shared_ptr<OperatorDropout<double>> opeDropout = std::make_shared<OperatorDropout<double>>(20);
+	std::shared_ptr<OperatorPerceptron<double>> opePerceptron2 = std::make_shared<OperatorPerceptron<double>>(nbNi1, nbNi2);
+	std::shared_ptr<OperatorPerceptron<double>> opePerceptron3 = std::make_shared<OperatorPerceptron<double>>(nbNi2, nbNi2);
+	std::shared_ptr<OperatorPerceptron<double>> opeOutput = std::make_shared<OperatorPerceptron<double>>(nbNi2, nbNO);
+
+	NNetwork m_nNetwork("CNN_Num8", DCrossEntropyLoss_Matrix<double>);
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeConv, "3conv5x5")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePooling, "pooling2x2")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeReLU, "activationReLUConv1")));
+
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeConv2, "3conv3x3")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePooling, "pooling2x2")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeReLU, "activationReLUConv2")));
+
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeFlatten, "flattenCol")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeConcat, "concatCol")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePerceptron1, "perceptrion1")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation1")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeDropout, "dropout_perceptron1")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePerceptron2, "perceptrion2")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation1")));
+	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opePerceptron3, "perceptrion3")));
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation1")));
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeOutput, "output10")));
 	m_nNetwork.AddLayer(std::shared_ptr<Layer<double>>(std::make_shared<Layer<double>>(opeSigmoid, "activation10")));
@@ -70,16 +335,16 @@ void CNN(bool m_training = true, bool m_testing = true, bool m_load = false, std
 		std::vector<Matrix<double>> dataImg;
 		std::cout << "training:" << std::endl;
 		std::cout << "	read data training:" << std::endl;
-		BuildData(labelsFile, imagesFile, dataPath, expectedY, dataImg);
+		BuildData(labelsFile, imagesFile, dataPath, expectedY, dataImg, nbNO);
 
 		bool learningIsFinish = false;
 		std::cout << "	training with " << expectedY.size() << " data:" << std::endl;
-		std::size_t nbIter = 350;
+		std::size_t nbIter = 100;//350;
 		uint64_t ttotal = 0;
 		uint64_t p = 0;
 		double Emin = 1.0;
 		size_t last = 0;
-		double learningRate = 10.0; // 5.0;//2.5;
+		double learningRate = 40.0; //20.0; //////10.0; // 5.0;//2.5;
 		double var = learningRate/2.0;
 		std::size_t nbBatch = dataImg.size() / batchSize;
 		for (std::size_t iter = 0; iter < nbIter && !learningIsFinish; iter++) {
@@ -107,7 +372,7 @@ void CNN(bool m_training = true, bool m_testing = true, bool m_load = false, std
 						serialiser.Save(".\\CNN_bis.txt", m_nNetwork);
 					}
 				}
-				if (std::abs(E) < 0.0001) {
+				if (std::abs(E) < 0.00001) {
 					learningIsFinish = true;
 				}
 				else {
@@ -135,7 +400,7 @@ void CNN(bool m_training = true, bool m_testing = true, bool m_load = false, std
 		std::vector<Matrix<double>> dataImg;
 		std::cout << "testing:" << std::endl;
 		std::cout << "	read data testing:" << std::endl;
-		BuildData(labelsFile, imagesFile, dataPath, expectedY, dataImg);
+		BuildData(labelsFile, imagesFile, dataPath, expectedY, dataImg, nbNO);
 		std::cout << "	testing with " << expectedY.size() << " data:" << std::endl;
 
 		std::vector<Matrix<double>> input = dataImg;
@@ -144,8 +409,10 @@ void CNN(bool m_training = true, bool m_testing = true, bool m_load = false, std
 		expY[0].Concat(expectedY, AxisFormat::COL);
 
 		m_nNetwork.Forward(input, outputA);
-		Matrix<double> result = outputA[0].applyFunction([](double x) {
-			return x >= 0.5 ? 1.0 : 0.0;});
+		Matrix<double> result(outputA[0].getCols(), outputA[0].getRows(), 0);
+		for (std::size_t c = 0; c < result.getCols(); c++) {
+			result.at(c, outputA[0].MaxIndexCol(c)) = 1.0;
+		}
 
 		for (std::size_t i = 0; i < opeConv->NbKernel(); i++) {
 			std::cout << "kernel" << std::to_string(i) << "=" << std::endl;
@@ -180,6 +447,24 @@ void CNN(bool m_training = true, bool m_testing = true, bool m_load = false, std
 			else {
 				std::cout << "!=";
 				error++;
+
+				std::vector<uint8_t> data_bmp;
+				for (uint32_t c = 0; c < input[i].getCols(); c++) {
+					for (uint32_t r = 0; r < input[i].getRows(); r++) {
+						data_bmp.push_back(denormalize<double, uint8_t>(input[i].at(c, r), 0.0, 255.0));
+					}
+				}
+				BMPfile bmp;
+				std::string R(1, cR[i]);
+				std::string EY(1, cY[i]);
+				std::string index = intToStringWithZeros(i, 5);
+
+
+				Matrix<uint8_t> img(input[i].getCols(), input[i].getRows(), data_bmp);
+				//img = img.transpose();
+
+				bmp.writeBMP8bit(".\\img_num_err\\Res_" + index + "_" + R + "_diff_exp_" + EY + ".bmp",
+					input[i].getCols(), input[i].getRows(), img.getData());
 			}
 			std::cout << cY[i] << " ";
 		}
@@ -464,7 +749,7 @@ void PerceptronChar() {
 		std::vector<Matrix<double>> dataImg;
 		std::cout << "training:" << std::endl;
 		std::cout << "	read data training:" << std::endl;
-		BuildData(labelsFile, imagesFile, dataPath, expectedY, dataImg);
+		BuildData(labelsFile, imagesFile, dataPath, expectedY, dataImg, nbNO);
 
 		bool learningIsFinish = false;
 		std::cout << "	training with " << expectedY.size() << " data:" << std::endl;
@@ -540,7 +825,7 @@ void PerceptronChar() {
 		std::vector<Matrix<double>> dataImg;
 		std::cout << "testing:" << std::endl;
 		std::cout << "	read data testing:" << std::endl;
-		BuildData(labelsFile, imagesFile, dataPath, expectedY, dataImg);
+		BuildData(labelsFile, imagesFile, dataPath, expectedY, dataImg, nbNO);
 		std::cout << "	testing with " << expectedY.size() << " data:" << std::endl;
 
 		std::vector<Matrix<double>> input = dataImg;
@@ -590,8 +875,9 @@ void PerceptronChar() {
 
 int main(int argc, char* argv[])
 {
-	std::cout << "V20260306" << std::endl;
+	std::cout << "V20260907" << std::endl;
 	try {
+		//CNN_AlphaNum();
 		CNN();
 		//PerceptronT(true);
 		//Perceptron3_1();

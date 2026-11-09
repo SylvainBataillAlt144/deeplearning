@@ -31,9 +31,9 @@ public:
 	~CMNISTReader();
 	CMNISTReader(CMNISTReader&) = delete;
 
-	void Init();
-	std::pair<std::vector<uint8_t>, uint8_t> Next();
-	bool NotRead();
+	void Init(uint32_t offset = 0);
+	std::pair<std::vector<uint8_t>, uint8_t> Next(uint32_t offset, uint32_t final);
+	bool NotRead(uint32_t offset, uint32_t final);
 	uint32_t getPCReading();
 
 	uint32_t getCols();
@@ -55,4 +55,5 @@ protected:
 };
 
 void BuildData(const std::string labelsFile, const std::string imagesFile, const std::string dataPath,
-	std::vector<Matrix<double>>& expectedY, std::vector<Matrix<double>>& dataImg);
+	std::vector<Matrix<double>>& expectedY, std::vector<Matrix<double>>& dataImg, std::size_t nb_class,
+	bool t = false, uint32_t offset = 0, uint32_t last = 10000000U);

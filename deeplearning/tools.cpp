@@ -1,6 +1,10 @@
 
 #include "tools.h"
 
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+
 int64_t GetFileSize(std::ifstream& Fichier)
 {
     // sauvegarder la position courante 
@@ -12,4 +16,10 @@ int64_t GetFileSize(std::ifstream& Fichier)
     // restaurer la position initiale du fichier 
     Fichier.seekg(pos, std::ios_base::beg);
     return size;
+}
+
+std::string intToStringWithZeros(int number, uint8_t width) {
+    std::ostringstream oss;
+    oss << std::setw(width) << std::setfill('0') << number;
+    return oss.str();
 }
